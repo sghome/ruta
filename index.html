@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Circles with Logo</title>
+    <title>Interactive Circles</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
 </head>
 <body>
@@ -20,14 +20,6 @@
             createCanvas(windowWidth, windowHeight);
             background(240);
             noStroke();
-            imageMode(CENTER);
-            drawLogo();
-        }
-
-        function drawLogo() {
-            let logoWidth = width / 3;
-            let logoHeight = (logo.height / logo.width) * logoWidth;
-            image(logo, width / 2, logoHeight / 2, logoWidth, logoHeight);
         }
 
         function draw() {
@@ -37,54 +29,42 @@
             let numDotsPerCircle = 4; // Número de puntos por círculo
             let dotSpacing = TWO_PI / numDotsPerCircle; // Espaciado angular entre los puntos
 
-            // Dibujar dots para cada píxel del logo
-            loadPixels();
-            for (let x = 0; x < logo.width; x += 2) {
-                for (let y = 0; y < logo.height; y += 2) {
-                    let index = (x + y * logo.width) * 4;
-                    let r = pixels[index];
-                    let g = pixels[index + 1];
-                    let b = pixels[index + 2];
-                    let a = pixels[index + 3];
+            // Dibujar los dots
+            for (let i = 0; i < numCircles; i++) {
+                let radius = map(i, 0, numCircles - 1, circleRadius, min(width, height) / 18); // Radio del círculo actual
+                let dotRadius = map(i, 0, numCircles - 1, 1, 1); // Tamaño del punto según el radio
+                for (let j = 0; j < numDotsPerCircle; j++) {
+                    let angle = j * dotSpacing; // Ángulo para este punto
+                    let x = width / 2 + cos(angle) * radius; // Coordenada x del punto
+                    let y = height / 2 + sin(angle) * radius; // Coordenada y del punto
 
-                    // Si el píxel no es transparente, dibujar un dot
-                    if (a > 0) {
-                        let posX = map(x, 0, logo.width, width / 2 - logo.width / 2, width / 2 + logo.width / 2);
-                        let posY = map(y, 0, logo.height, logoHeight / 2, logoHeight);
-                        for (let i = 0; i < numCircles; i++) {
-                            let radius = map(i, 0, numCircles - 1, circleRadius, min(width, height) / 18); // Radio del círculo actual
-                            let dotRadius = map(i, 0, numCircles - 1, 1, 1); // Tamaño del punto según el radio
-                            for (let j = 0; j < numDotsPerCircle; j++) {
-                                let angle = j * dotSpacing; // Ángulo para este punto
-                                let xDot = posX + cos(angle) * radius; // Coordenada x del punto
-                                let yDot = posY + sin(angle) * radius; // Coordenada y del punto
+                    let mouseDist = dist(x, y, mouseX, mouseY); // Distancia del mouse al punto
 
-                                let mouseDist = dist(xDot, yDot, mouseX, mouseY); // Distancia del mouse al punto
-
-                                // Si la distancia al mouse es mayor que 20 y menor que la última distancia registrada,
-                                // conservar el último tamaño ajustado
-                                let adjustedDotRadius;
-                                if (mouseDist > 20 && mouseDist < lastMouseDist) {
-                                    adjustedDotRadius = originalDotRadius;
-                                } else {
-                                    adjustedDotRadius = dotRadius - mouseDist / 1; // Ajustar el tamaño del punto
-                                    originalDotRadius = adjustedDotRadius; // Actualizar el último tamaño ajustado
-                                }
-
-                                // Colores en tonos de rojos y violetas
-                                let red = color(252, 178, 179); // '#fcb2b3'
-                                let purple = color(138, 43, 226); // '#8a2be2'
-                                let violet = color(102, 180, 218); // '#66b4da'
-                                let fillColor = lerpColor(red, violet, i / numCircles);
-                                fill(fillColor); // Color del punto
-                                ellipse(xDot, yDot, adjustedDotRadius, adjustedDotRadius); // Dibujar el punto
-                            }
-                        }
+                    // Si la distancia al mouse es mayor que 20, no ajustar el tamaño del punto
+                    let adjustedDotRadius;
+                    if (mouseDist > 20) {
+                        adjustedDotRadius = originalDotRadius;
+                    } else {
+                        adjustedDotRadius = dotRadius; // Tamaño original del punto
                     }
+
+                    // Colores en tonos de rojos y violetas
+                    let red = color(252, 178, 179); // '#fcb2b3'
+                    let purple = color(138, 43, 226); // '#8a2be2'
+                    let violet = color(102, 180, 218); // '#66b4da'
+                    let fillColor = lerpColor(red, violet, i / numCircles);
+                    fill(fillColor); // Color del punto
+                    ellipse(x, y, adjustedDotRadius, adjustedDotRadius); // Dibujar el punto
                 }
             }
+
+            // Dibujar el logo
+            imageMode(CENTER);
+            let logoWidth = width / 3;
+            let logoHeight = (logo.height / logo.width) * logoWidth;
+            image(logo, width / 2, logoHeight / 2 + 50, logoWidth, logoHeight); // Subir el logo
+
             lastMouseDist = dist(width / 2, height / 2, mouseX, mouseY); // Actualizar la última distancia al mouse
-            drawLogo();
         }
     </script>
 </body>
