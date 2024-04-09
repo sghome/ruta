@@ -44,11 +44,11 @@
                     normal: flip(normalise(bezT(bezControlPoints, i / (pathRes - 1)))),
                 })),
                 Array.from({ length: pathRes }, (_, i) => ({
-                    point: lerpVec(stemPoints, i / (pathRes - 1)),
+                    point: lerpVec(stemPoints[0], stemPoints[1], i / (pathRes - 1)),
                     normal: flip(normalise(dirVec(stemPoints))),
                 })),
                 Array.from({ length: pathRes }, (_, i) => ({
-                    point: lerpVec(dashPoints, i / (pathRes - 1)),
+                    point: lerpVec(dashPoints[0], dashPoints[1], i / (pathRes - 1)),
                     normal: flip(normalise(dirVec(dashPoints))),
                 }))
             ];
@@ -88,10 +88,7 @@
         }
 
         function lerpVec(a, b, t) {
-            return [
-                lerp(a[0], b[0], t),
-                lerp(a[1], b[1], t)
-            ];
+            return lerp(a, b, t);
         }
 
         function dirVec(points) {
