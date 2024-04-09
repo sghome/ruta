@@ -115,8 +115,8 @@
             const b = Math.PI * (g + Math.atan2(d[1], d[0])) + (output < 0.5 ? Math.PI : 0);
             const c = normalise(Math.cos(a), Math.sin(a));
             const cp = [p[0] + c[0] * lineWeight / 2, p[1] + c[1] * lineWeight / 2];
-            const d = normalise(Math.cos(b), Math.sin(b));
-            const dp = [p[0] + d[0] * lineWeight / 2, p[1] + d[1] * lineWeight / 2];
+            const d2 = normalise(Math.cos(b), Math.sin(b)); // Cambié `d` a `d2`
+            const dp = [p[0] + d2[0] * lineWeight / 2, p[1] + d2[1] * lineWeight / 2]; // Cambié `d` a `d2`
             const x1 = np[0] + flip(np[0] - cp[0], np[1] - cp[1])[0] * lineWeight;
             const y1 = np[1] + flip(np[0] - cp[0], np[1] - cp[1])[1] * lineWeight;
             const x2 = dp[0] + flip(dp[0] - np2[0], dp[1] - np2[1])[0] * lineWeight;
