@@ -88,7 +88,10 @@
         }
 
         function lerpVec(a, b, t) {
-            return lerp(a, b, t);
+            return [
+                lerp(a[0], b[0], t),
+                lerp(a[1], b[1], t)
+            ];
         }
 
         function dirVec(points) {
