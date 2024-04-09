@@ -3,69 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Circles</title>
+    <title>HAZECO Logo</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+    </style>
 </head>
 <body>
     <script>
-        let originalDotRadius = 1; // Tamaño original del punto
-        let lastMouseDist = Infinity; // Última distancia al mouse
-        let logo;
+        let message = "HAZECO";
+        let fontSize = 500;
+        let rangeX = 0.2;
+        let rangeY = 0.2;
+        let lineMultiplication = 10;
+        let lineOpacity = 0.6;
+        let lineWidth = 0.3;
+        let randomness = 0.2;
+        let crop = 0;
+
+        let messageSize;
+        let font;
+        let finalWidth;
+        let pointsIn, pointsOut;
+        let lettersImages;
 
         function preload() {
-            logo = loadImage('https://cdn.glitch.global/c536c49d-7661-4fd9-81b8-918d12539028/hazeco.svg');
+            font = loadFont('BebasNeue-Regular.ttf');
         }
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
-            background(240);
+            pixelDensity(1);
             noStroke();
+            fill(0);
+            
+            messageSize = Math.hypot(windowWidth, windowHeight) / Math.hypot(1920, 1080) * fontSize
+            crop = floor(map(0, 0, 1, 0, messageSize/2*0.8));
+            
+            textFont(font);
+            textSize(messageSize);
+            
+            let x = 0;
+            finalWidth = textWidth(message);
+            
+            [...message].forEach(char => {
+                let tW = ceil(textWidth(char));
+                let graph = createGraphics(tW, messageSize);
+                graph.textFont(font);
+                graph.textSize(messageSize);
+                graph.textAlign(CENTER, CENTER);
+                graph.text(char, graph.width/2, graph.height/2*0.8);
+                graph.x = round(x);
+                lettersImages.push(graph);
+                graph.loadPixels();
+                
+                const pD = graph.pixelDensity();
+                const yIn = (graph.width * pD) * floor((graph.height/2 - crop) * pD) * 4;
+                const yOut = (graph.width * pD) * floor((graph.height/2 + crop) * pD) * 4;
+                for(let i = 0; i < graph.width; i++){
+                    const alphaIndexIn = i * 4 * pD + yIn + 3;
+                    const alphaIndexOut = i * 4 * pD + yOut + 3;
+                    let alphaIn = graph.pixels[alphaIndexIn];
+                    let alphaOut = graph.pixels[alphaIndexOut];
+                    if(alphaIn > 100){
+                        pointsIn.push({
+                            x: i + x,
+                            y: graph.height/2 - crop
+                        });
+                    }
+                    if(alphaOut > 100){
+                        pointsOut.push({
+                            x: i + x,
+                            y: graph.height/2 + crop
+                        });
+                    }
+                }
+                
+                x += tW;
+            });
         }
 
-        function draw() {
-            background(240);
-            let circleRadius = min(width, height) / 81; // Radio del círculo
-            let numCircles = 5; // Número de círculos concéntricos
-            let numDotsPerCircle = 4; // Número de puntos por círculo
-            let dotSpacing = TWO_PI / numDotsPerCircle; // Espaciado angular entre los puntos
-
-            for (let i = 0; i < numCircles; i++) {
-                let radius = map(i, 0, numCircles - 1, circleRadius, min(width, height) / 18); // Radio del círculo actual
-                let dotRadius = map(i, 0, numCircles - 1, 1, 1); // Tamaño del punto según el radio
-                for (let j = 0; j < numDotsPerCircle; j++) {
-                    let angle = j * dotSpacing; // Ángulo para este punto
-                    let x = width / 2 + cos(angle) * radius; // Coordenada x del punto
-                    let y = height / 2 + sin(angle) * radius; // Coordenada y del punto
-
-                    let mouseDist = dist(x, y, mouseX, mouseY); // Distancia del mouse al punto
-
-                    // Si la distancia al mouse es mayor que 20 y menor que la última distancia registrada,
-                    // conservar el último tamaño ajustado
-                    let adjustedDotRadius;
-                    if (mouseDist > 20 && mouseDist < lastMouseDist) {
-                        adjustedDotRadius = originalDotRadius;
-                    } else {
-                        adjustedDotRadius = dotRadius - mouseDist / 1; // Ajustar el tamaño del punto
-                        originalDotRadius = adjustedDotRadius; // Actualizar el último tamaño ajustado
-                    }
-
-                    // Colores en tonos de rojos y violetas
-                    let red = color(252, 178, 179); // '#fcb2b3'
-                    let purple = color(138, 43, 226); // '#8a2be2'
-                    let violet = color(102, 180, 218); // '#66b4da'
-                    let fillColor = lerpColor(red, violet, i / numCircles);
-                    fill(fillColor); // Color del punto
-                    ellipse(x, y, adjustedDotRadius, adjustedDotRadius); // Dibujar el punto
-                }
-            }
-
-            // Dibujar el logo
-            imageMode(CENTER);
-            let logoWidth = width / 3;
-            let logoHeight = (logo.height / logo.width) * logoWidth;
-            image(logo, width / 2, height - logoHeight / 2, logoWidth, logoHeight);
+        function draw(){
+            background(255);
+            randomSeed(0);
             
-            lastMouseDist = dist(width / 2, height / 2, mouseX, mouseY); // Actualizar la última distancia al mouse
+            let distX = mouseX / width;
+            let distY = mouseY / height;
+            let startX = round((width - finalWidth) * distX);
+            let endX = round((width - finalWidth) * (1-distX));
+            let startY = height * distY;
+            let endY = height * (1-distY);
+            
+            //draw letters
+            lettersImages.forEach(graph => {
+                image(graph, round(graph.x + startX), startY, graph.width, graph.height/2 - crop, 0, 0, graph.width, graph.height/2 - crop);
+
+                let xx = graph.x + endX;
+                let yy = endY - graph.height/2;
+                image(graph, xx, yy, graph.width, graph.height, 0, graph.height/2 + crop, graph.width, graph.height + crop);
+            });
+            
+            if(pointsIn.length == 0 || pointsOut.length == 0)
+                return;
+            
+            //draw connections
+            strokeWeight(lineWidth);
+            stroke(0);
+            const gradient = drawingContext.createLinearGradient(startX, startY + lettersImages[0].height/2, startX, endY - lettersImages[0].height/2);
+            gradient.addColorStop(0, "black");
+            gradient.addColorStop(0.3, "rgba(0, 0, 0, " + lineOpacity + ")");
+            gradient.addColorStop(0.5, "rgba(0, 0, 0, " + (lineOpacity*lineOpacity) + ")");
+            gradient.addColorStop(0.7, "rgba(0, 0, 0, " + lineOpacity + ")");
+            gradient.addColorStop(1, "black");
+            drawingContext.strokeStyle = gradient;
+            noFill();
+            pointsIn.forEach((coord, index) => {
+                for(var d = 0; d < lineMultiplication; d++){
+                    const endCoord = random() > randomness ? pointsOut[floor(map(index, 0, pointsIn.length, 0, pointsOut.length))] : random(pointsOut);
+                    const controlY = random(-rangeY, rangeY);
+                    const anchorX1 = coord.x + startX + 0.5;
+                    const anchorY1 = coord.y + startY - 1;
+                    const anchorX2 = endCoord.x + endX + 0.5;
+                    const anchorY2 = endY - endCoord.y + 1 + crop;
+                    const controlX1 = lerp(anchorX1, width/2, random(rangeX));
+                    const controlY1 = lerp(anchorY1, anchorY2, 0.8 + controlY);
+                    const controlX2 = lerp(anchorX2, width/2, random(rangeX));
+                    const controlY2 = lerp(anchorY1, anchorY2,  0.2 + controlY);
+                    bezier(anchorX1, anchorY1,
+                                    controlX1, controlY1,
+                                    controlX2, controlY2,
+                                    anchorX2, anchorY2);
+                }
+            })
         }
     </script>
 </body>
