@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruta Libre</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+</head>
+<body>
+    <script>
+        // Constants
+        const dim = 400;
+        const pathRes = 60;
+        const lineWeight = 0.015;
+        let step = 0.002;
+
+        // Control points for Bezier curve, stem, and dash
+        const bezControlPoints = [[0.2, 0.2], [0.4, 0.8], [0.6, 0.2], [0.8, 0.8]];
+        const stemPoints = [[0.4, 0.8], [0.4, 0.2]];
+        const dashPoints = [[0.6, 0.8], [0.6, 0.2]];
+
+        // Colors for the lines
+        const colours = [[255, 0, 0], [0, 255, 0], [0, 0, 255]];
+
+        // Time variables
+        const t = {"loop": x => x % 1, "invCubic": x => 1 - Math.pow(1 - x, 3)};
+        let gt = 0;
+        let loop = 0;
+
+        // Current and next output indices
+        let currentOutput = 0;
+        let nextOutput = 1;
+
+        // Unseen outputs for moving transition
+        let unseenOutputs = Array.from({ length: 8 }, (_, i) => i);
+
+        // Global variables for rendering
+        let ctx = [];
+        let collideCtx = null;
+        let collidePixels = [];
+
+        // Function to calculate direction vector
+        function dirVec(p1, p2) {
+            return [p2[0] - p1[0], p2[1] - p1[1]];
+        }
+
+        // Function to normalize vector
+        function normalise(x, y) {
+            const length = Math.sqrt(x ** 2 + y ** 2);
+            return [x / length, y / length];
+        }
+
+        // Function to flip vector
+        function flip(x, y) {
+            return [-y, x];
+        }
+
+        // Interpolation function
+        function comp(a, b) {
+            return t => a * (1 - t) + b * t;
+        }
+
+        // Function to draw the "ruta libre" text
+        function drawRutaLibre(out) {
+            ctx[out].fill(0);
+            ctx[out].textAlign(p5.CENTER, p5.CENTER);
+            ctx[out].textSize(48);
+            ctx[out].text("Ruta Libre", dim / 2, dim / 2);
+        }
+
+        // Function to draw the logo
+        function drawLogo(time, out = null) {
+            // Clear the canvas
+            ctx[out].background(255);
+            // Draw "ruta libre" text
+            drawRutaLibre(out);
+        }
+
+        // Function to get the next (moving) output index
+        function nextMovingOutput() {
+            // Generate a new output list if we're at the end
+            if (nextOutput === unseenOutputs.length) {
+                unseenOutputs = Array.from({ length: 8 }, (_, i) => i);
+                nextOutput = 0;
+            }
+            // Pick the next output, remove it from unseenOutputs
+            let out = unseenOutputs.splice(nextOutput, 1)[0];
+            // If the current output is our nextOutput, increment it so we don't loop on the same output
+            if (out === currentOutput) {
+                nextOutput++;
+            }
+            return out;
+        }
+
+        // Setup function
+        function setup() {
+            // Init p5 contexts
+            ctx = Array.from({ length: 8 }, () => createGraphics(dim, dim, P3D));
+            // We're going to need the points for the shapes to make the collide context
+            let points = [];
+            points.push(...bezControlPoints);
+            points.push(...stemPoints);
+            points.push(...dashPoints);
+            // Get the bounds
+            let [xmin, ymin] = points.reduce(([xmin, ymin], [x, y]) => [Math.min(xmin, x), Math.min(ymin, y)], [Infinity, Infinity]);
+            let [xmax, ymax] = points.reduce(([xmax, ymax], [x, y]) => [Math.max(xmax, x), Math.max(ymax, y)], [-Infinity, -Infinity]);
+            let width = xmax - xmin;
+            let height = ymax - ymin;
+            // Scale the points so they fit in the collide ctx
+            points = points.map(([x, y]) => [(x - xmin) / width, (y - ymin) / height]);
+            // Init the collide context
+            collideCtx = createGraphics(width * pathRes, height * pathRes);
+            // Draw the shapes in the collide ctx
+            collideCtx.beginDraw();
+            collideCtx.background(255);
+            collideCtx.stroke(0);
+            collideCtx.strokeWeight(1);
+            collideCtx.noFill();
+            collideCtx.beginShape();
+            points.forEach(([x, y]) => collideCtx.vertex(x * collideCtx.width, y * collideCtx.height));
+            collideCtx.endShape(CLOSE);
+            collideCtx.endDraw();
+            // Bake the distance field to the pixels array
+            collidePixels = [];
+            collideCtx.loadPixels();
+            for (let i = 0; i < collideCtx.width * collideCtx.height; i++) {
+                collidePixels.push(collideCtx.pixels[i] === -16777216 ? 0 : 1);
+            }
+            collideCtx.updatePixels();
+        }
+
+        // Function to draw the canvas
+        function draw() {
+            // If the current time step is greater than 1, set it to 0 and increment the loop counter
+            if (gt > 1) {
+                gt = 0;
+                loop++;
+            }
+            // Get the next moving output if we've looped or if we're supposed to cycle
+            if (loop > 0) {
+                nextOutput = nextMovingOutput();
+            }
+            // Interpolate the two outputs
+            let out = currentOutput * (1 - gt) + nextOutput * gt;
+            // Draw the logo
+            drawLogo(comp(t["invCubic"], t["loop"])(gt), out);
+            // Increment the current time step
+            gt += step;
+        }
+
+        // Setup the canvas
+        function setupCanvas() {
+            createCanvas(dim, dim, WEBGL);
+            setup();
+        }
+
+        // Draw the canvas
+        function drawCanvas() {
+            draw();
+        }
+
+        // Setup the canvas
+        window.setupCanvas = setupCanvas;
+        // Draw the canvas
+        window.drawCanvas = drawCanvas;
+    </script>
+</body>
+</html>
