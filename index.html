@@ -3,128 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-    <title>Logo</title>
+    <title>LOGO</title>
     <style>
         body {
             margin: 0;
+            overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
+            background-color: #f2f7ff;
         }
-
         canvas {
-            border: 1px solid black;
+            border: 1px solid #ccc;
         }
     </style>
 </head>
 <body>
+    <canvas id="myCanvas"></canvas>
     <script>
-        let dim = 800;
-        let pathRes = 30;
-        let lineWeight = 4;
-        let colours = [[5, 100, 255], [30, 50, 170], [130, 175, 255]];
+        const step = 0.0001; // step per frame
+        let gt = 0.5; // current timestep
+        let loop = 0; // how many times we've looped so far
+        const dim = 800; // dimension of the sketch
+        const pathRes = 30; // resolution of the lines
+        const lineWeight = 0.1875; // thickness of the lines
+        let cycle = true; // should we cycle through outputs
+        let currentOutput = 0; // starting output
+        const bezControlPoints = [
+            [0, -0.75],
+            [0.75, -0.75],
+            [0.75, 0.25],
+            [0, 0.25]
+        ]; // control points for the curve
+        const stemPoints = [
+            [-0.75, 0.5],
+            [0, -0.5]
+        ]; // control points for the long line
+        const dashPoints = [
+            [-0.75, -0.25],
+            [-0.5, 0.25]
+        ]; // control points for the short line
+        const colours = [
+            [5 / 255, 100 / 255, 1],
+            [30 / 255, 50 / 255, 170 / 255],
+            [130 / 255, 175 / 255, 1]
+        ]; // colours for each line
 
-        function setup() {
-            createCanvas(dim, dim);
-            drawLogo();
-        }
+        const canvas = document.getElementById('myCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = dim;
+        canvas.height = dim;
 
-        function drawLogo() {
-            background(242, 247, 255);
-            noStroke();
+        // Define functions for calculating and moving points
 
-            let bezControlPoints = [[0, -0.75], [0.75, -0.75], [0.75, 0.25], [0, 0.25]].map(p => [p[0] * dim * 0.5 + dim * 0.5, p[1] * dim * 0.5 + dim * 0.5]);
-            let stemPoints = [[-0.75, 0.5], [0, -0.5]].map(p => [p[0] * dim * 0.5 + dim * 0.5, p[1] * dim * 0.5 + dim * 0.5]);
-            let dashPoints = [[-0.75, -0.25], [-0.5, 0.25]].map(p => [p[0] * dim * 0.5 + dim * 0.5, p[1] * dim * 0.5 + dim * 0.5]);
-            let paths = [
-                Array.from({ length: pathRes }, (_, i) => ({
-                    point: bezP(bezControlPoints, i / (pathRes - 1)),
-                    normal: flip(normalise(bezT(bezControlPoints, i / (pathRes - 1)))),
-                })),
-                Array.from({ length: pathRes }, (_, i) => ({
-                    point: lerpVec(stemPoints[0], stemPoints[1], i / (pathRes - 1)),
-                    normal: flip(normalise(dirVec(stemPoints))),
-                })),
-                Array.from({ length: pathRes }, (_, i) => ({
-                    point: lerpVec(dashPoints[0], dashPoints[1], i / (pathRes - 1)),
-                    normal: flip(normalise(dirVec(dashPoints))),
-                }))
-            ];
+        // Return a direction vector between two points
+        const dirVec = ([x1, y1], [x2, y2]) => [x2 - x1, y2 - y1];
 
-            let bounds = paths.map(p => genBounds(p, lineWeight));
+        // Return the distance between two points
+        const dist = ([x1, y1], [x2, y2]) => Math.hypot(x2 - x1, y2 - y1);
 
-            bounds.forEach((b, bi) => {
-                fill(colours[bi]);
-                beginShape();
-                b.forEach(p => vertex(...p));
-                endShape(CLOSE);
-            });
-        }
-
-        function bezP(points, t) {
-            let [a, b, c, d] = points;
-            return [
-                bez(a[0], b[0], c[0], d[0], t),
-                bez(a[1], b[1], c[1], d[1], t)
-            ];
-        }
-
-        function bezT(points, t) {
-            let [a, b, c, d] = points;
-            return [
-                bezTangent(a[0], b[0], c[0], d[0], t),
-                bezTangent(a[1], b[1], c[1], d[1], t)
-            ];
-        }
-
-        function bez(a, b, c, d, t) {
-            return Math.pow(1 - t, 3) * a + 3 * Math.pow(1 - t, 2) * t * b + 3 * (1 - t) * Math.pow(t, 2) * c + Math.pow(t, 3) * d;
-        }
-
-        function bezTangent(a, b, c, d, t) {
-            return -3 * Math.pow(1 - t, 2) * a + 3 * Math.pow(1 - t, 2) * b - 6 * t * (1 - t) * b - 3 * Math.pow(t, 2) * c + 6 * t * (1 - t) * c + 3 * Math.pow(t, 2) * d;
-        }
-
-        function lerpVec(a, b, t) {
-            return [
-                lerp(a[0], b[0], t),
-                lerp(a[1], b[1], t)
-            ];
-        }
-
-        function dirVec(points) {
-            return [
-                points[1][0] - points[0][0],
-                points[1][1] - points[0][1]
-            ];
-        }
-
-        function normalise(vec) {
-            let [x, y] = vec;
-            let l = Math.sqrt(x * x + y * y);
+        // Normalize a vector
+        const normalise = (x, y) => {
+            const l = Math.sqrt(x * x + y * y);
             return l === 0 ? [x, y] : [x / l, y / l];
-        }
+        };
 
-        function flip(vec) {
-            return [-vec[1], vec[0]];
-        }
+        // Rotate a vector
+        const flip = (x, y) => [-y, x];
 
-        function genBounds(path, weight) {
-            let bounds = [];
-            for (let i = 0; i < path.length; i++) {
-                let [p, n] = [path[i].point, path[i].normal];
-                let line = [p[0] + n[0] * weight, p[1] + n[1] * weight];
-                bounds.push(line);
+        // Point on a cubic bezier (a, b, c, d) at position t
+        const bezP = (a, b, c, d, t) =>
+            Array.isArray(a)
+                ? a.map((x, i) => bezP(a[i], b[i], c[i], d[i], t))
+                : Math.pow(1 - t, 3) * a + 3 * Math.pow(1 - t, 2) * t * b + 3 * (1 - t) * Math.pow(t, 2) * c + Math.pow(t, 3) * d;
+
+        // Derivative/tangent of a cubic bezier (a, b, c, d) at position t
+        const bezT = (a, b, c, d, t) =>
+            Array.isArray(a)
+                ? a.map((x, i) => bezT(a[i], b[i], c[i], d[i], t))
+                : -3 * Math.pow(1 - t, 2) * a + 3 * Math.pow(1 - t, 2) * b - 6 * t * (1 - t) * b - 3 * Math.pow(t, 2) * c + 6 * t * (1 - t) * c + 3 * Math.pow(t, 2) * d;
+
+        // Linear interpolation between two vectors by magnitude t
+        const lerpVec = ([x1, y1], [x2, y2], t) => [x1 + t * (x2 - x1), y1 + t * (y2 - y1)];
+
+        // 1D smoothstep function
+        const smoothstep = t => t * t * (3 - 2 * t);
+
+        // Return a point on the logo
+        const logoP = (t, gt, loop, output) => {
+            const modGT = gt % 1;
+            const bIndex = Math.floor(modGT * bezControlPoints.length);
+            const bPoint = bezControlPoints[bIndex];
+            const p1 = lerpVec(stemPoints[0], stemPoints[1], smoothstep(modGT));
+            const p2 = lerpVec(dashPoints[0], dashPoints[1], smoothstep(modGT));
+            const p = lerpVec(p1, p2, smoothstep(t));
+            const d = bezT(bezControlPoints[bIndex], bezControlPoints[(bIndex + 1) % bezControlPoints.length], bezControlPoints[(bIndex + 2) % bezControlPoints.length], bezControlPoints[(bIndex + 3) % bezControlPoints.length], modGT);
+            const r = Math.PI / 2 + Math.atan2(d[1], d[0]);
+            const offset = (Math.floor(modGT * colours.length) + loop) % colours.length;
+            ctx.strokeStyle = `rgba(${colours[offset].join(',')},${1 - Math.abs(0.5 - modGT) * 2})`;
+            ctx.lineWidth = lineWeight;
+            ctx.beginPath();
+            ctx.moveTo(p[0] + Math.cos(r) * lineWeight / 2, p[1] + Math.sin(r) * lineWeight / 2);
+            ctx.lineTo(p[0] - Math.cos(r) * lineWeight / 2, p[1] - Math.sin(r) * lineWeight / 2);
+            ctx.stroke();
+            const q = normalise(d[0], d[1]);
+            const np = [p[0] + q[0] * lineWeight / 2, p[1] + q[1] * lineWeight / 2];
+            const np2 = [p[0] - q[0] * lineWeight / 2, p[1] - q[1] * lineWeight / 2];
+            const g = (output - 0.5) * 2;
+            const a = Math.PI * (g + Math.atan2(-d[1], -d[0])) + (output < 0.5 ? Math.PI : 0);
+            const b = Math.PI * (g + Math.atan2(d[1], d[0])) + (output < 0.5 ? Math.PI : 0);
+            const c = normalise(Math.cos(a), Math.sin(a));
+            const cp = [p[0] + c[0] * lineWeight / 2, p[1] + c[1] * lineWeight / 2];
+            const d = normalise(Math.cos(b), Math.sin(b));
+            const dp = [p[0] + d[0] * lineWeight / 2, p[1] + d[1] * lineWeight / 2];
+            const x1 = np[0] + flip(np[0] - cp[0], np[1] - cp[1])[0] * lineWeight;
+            const y1 = np[1] + flip(np[0] - cp[0], np[1] - cp[1])[1] * lineWeight;
+            const x2 = dp[0] + flip(dp[0] - np2[0], dp[1] - np2[1])[0] * lineWeight;
+            const y2 = dp[1] + flip(dp[0] - np2[0], dp[1] - np2[1])[1] * lineWeight;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            return [bezP(bPoint[0], bPoint[1], bPoint[2], bPoint[3], modGT), r];
+        };
+
+        // Main draw function
+        const draw = () => {
+            ctx.clearRect(0, 0, dim, dim);
+            const [p, r] = logoP(cycle ? (currentOutput * 2 - 1) : 1, gt, loop, currentOutput);
+            gt += step;
+            if (gt >= 1) {
+                gt = 0;
+                loop++;
             }
-            for (let i = path.length - 1; i >= 0; i--) {
-                let [p, n] = [path[i].point, path[i].normal];
-                let line = [p[0] - n[0] * weight, p[1] - n[1] * weight];
-                bounds.push(line);
-            }
-            return bounds;
-        }
+            requestAnimationFrame(draw);
+        };
+
+        // Start the animation
+        draw();
     </script>
 </body>
 </html>
