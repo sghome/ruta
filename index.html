@@ -3,145 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGO</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #f2f7ff;
-        }
-        canvas {
-            border: 1px solid #ccc;
-        }
-    </style>
+    <title>Interactive Circles</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
 </head>
 <body>
-    <canvas id="myCanvas"></canvas>
     <script>
-        const step = 0.0001; // step per frame
-        let gt = 0.5; // current timestep
-        let loop = 0; // how many times we've looped so far
-        const dim = 800; // dimension of the sketch
-        const pathRes = 30; // resolution of the lines
-        const lineWeight = 0.1875; // thickness of the lines
-        let cycle = true; // should we cycle through outputs
-        let currentOutput = 0; // starting output
-        const bezControlPoints = [
-            [0, -0.75],
-            [0.75, -0.75],
-            [0.75, 0.25],
-            [0, 0.25]
-        ]; // control points for the curve
-        const stemPoints = [
-            [-0.75, 0.5],
-            [0, -0.5]
-        ]; // control points for the long line
-        const dashPoints = [
-            [-0.75, -0.25],
-            [-0.5, 0.25]
-        ]; // control points for the short line
-        const colours = [
-            [5 / 255, 100 / 255, 1],
-            [30 / 255, 50 / 255, 170 / 255],
-            [130 / 255, 175 / 255, 1]
-        ]; // colours for each line
+        let originalDotRadius = 1; // Tamaño original del punto
+        let lastMouseDist = Infinity; // Última distancia al mouse
+        let logo;
 
-        const canvas = document.getElementById('myCanvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = dim;
-        canvas.height = dim;
+        function preload() {
+            logo = loadImage('https://cdn.glitch.global/c536c49d-7661-4fd9-81b8-918d12539028/hazeco.svg');
+        }
 
-        // Define functions for calculating and moving points
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            background(240);
+            noStroke();
+        }
 
-        // Return a direction vector between two points
-        const dirVec = ([x1, y1], [x2, y2]) => [x2 - x1, y2 - y1];
+        function draw() {
+            background(240);
+            let circleRadius = min(width, height) / 81; // Radio del círculo
+            let numCircles = 5; // Número de círculos concéntricos
+            let numDotsPerCircle = 4; // Número de puntos por círculo
+            let dotSpacing = TWO_PI / numDotsPerCircle; // Espaciado angular entre los puntos
 
-        // Return the distance between two points
-        const dist = ([x1, y1], [x2, y2]) => Math.hypot(x2 - x1, y2 - y1);
+            for (let i = 0; i < numCircles; i++) {
+                let radius = map(i, 0, numCircles - 1, circleRadius, min(width, height) / 18); // Radio del círculo actual
+                let dotRadius = map(i, 0, numCircles - 1, 1, 1); // Tamaño del punto según el radio
+                for (let j = 0; j < numDotsPerCircle; j++) {
+                    let angle = j * dotSpacing; // Ángulo para este punto
+                    let x = width / 2 + cos(angle) * radius; // Coordenada x del punto
+                    let y = height / 2 + sin(angle) * radius; // Coordenada y del punto
 
-        // Normalize a vector
-        const normalise = (x, y) => {
-            const l = Math.sqrt(x * x + y * y);
-            return l === 0 ? [x, y] : [x / l, y / l];
-        };
+                    let mouseDist = dist(x, y, mouseX, mouseY); // Distancia del mouse al punto
 
-        // Rotate a vector
-        const flip = (x, y) => [-y, x];
+                    // Si la distancia al mouse es mayor que 20 y menor que la última distancia registrada,
+                    // conservar el último tamaño ajustado
+                    let adjustedDotRadius;
+                    if (mouseDist > 20 && mouseDist < lastMouseDist) {
+                        adjustedDotRadius = originalDotRadius;
+                    } else {
+                        adjustedDotRadius = dotRadius - mouseDist / 1; // Ajustar el tamaño del punto
+                        originalDotRadius = adjustedDotRadius; // Actualizar el último tamaño ajustado
+                    }
 
-        // Point on a cubic bezier (a, b, c, d) at position t
-        const bezP = (a, b, c, d, t) =>
-            Array.isArray(a)
-                ? a.map((x, i) => bezP(a[i], b[i], c[i], d[i], t))
-                : Math.pow(1 - t, 3) * a + 3 * Math.pow(1 - t, 2) * t * b + 3 * (1 - t) * Math.pow(t, 2) * c + Math.pow(t, 3) * d;
-
-        // Derivative/tangent of a cubic bezier (a, b, c, d) at position t
-        const bezT = (a, b, c, d, t) =>
-            Array.isArray(a)
-                ? a.map((x, i) => bezT(a[i], b[i], c[i], d[i], t))
-                : -3 * Math.pow(1 - t, 2) * a + 3 * Math.pow(1 - t, 2) * b - 6 * t * (1 - t) * b - 3 * Math.pow(t, 2) * c + 6 * t * (1 - t) * c + 3 * Math.pow(t, 2) * d;
-
-        // Linear interpolation between two vectors by magnitude t
-        const lerpVec = ([x1, y1], [x2, y2], t) => [x1 + t * (x2 - x1), y1 + t * (y2 - y1)];
-
-        // 1D smoothstep function
-        const smoothstep = t => t * t * (3 - 2 * t);
-
-        // Return a point on the logo
-        const logoP = (t, gt, loop, output) => {
-            const modGT = gt % 1;
-            const bIndex = Math.floor(modGT * bezControlPoints.length);
-            const bPoint = bezControlPoints[bIndex];
-            const p1 = lerpVec(stemPoints[0], stemPoints[1], smoothstep(modGT));
-            const p2 = lerpVec(dashPoints[0], dashPoints[1], smoothstep(modGT));
-            const p = lerpVec(p1, p2, smoothstep(t));
-            const d = bezT(bezControlPoints[bIndex], bezControlPoints[(bIndex + 1) % bezControlPoints.length], bezControlPoints[(bIndex + 2) % bezControlPoints.length], bezControlPoints[(bIndex + 3) % bezControlPoints.length], modGT);
-            const r = Math.PI / 2 + Math.atan2(d[1], d[0]);
-            const offset = (Math.floor(modGT * colours.length) + loop) % colours.length;
-            ctx.strokeStyle = `rgba(${colours[offset].join(',')},${1 - Math.abs(0.5 - modGT) * 2})`;
-            ctx.lineWidth = lineWeight;
-            ctx.beginPath();
-            ctx.moveTo(p[0] + Math.cos(r) * lineWeight / 2, p[1] + Math.sin(r) * lineWeight / 2);
-            ctx.lineTo(p[0] - Math.cos(r) * lineWeight / 2, p[1] - Math.sin(r) * lineWeight / 2);
-            ctx.stroke();
-            const q = normalise(d[0], d[1]);
-            const np = [p[0] + q[0] * lineWeight / 2, p[1] + q[1] * lineWeight / 2];
-            const np2 = [p[0] - q[0] * lineWeight / 2, p[1] - q[1] * lineWeight / 2];
-            const g = (output - 0.5) * 2;
-            const a = Math.PI * (g + Math.atan2(-d[1], -d[0])) + (output < 0.5 ? Math.PI : 0);
-            const b = Math.PI * (g + Math.atan2(d[1], d[0])) + (output < 0.5 ? Math.PI : 0);
-            const c = normalise(Math.cos(a), Math.sin(a));
-            const cp = [p[0] + c[0] * lineWeight / 2, p[1] + c[1] * lineWeight / 2];
-            const d2 = normalise(Math.cos(b), Math.sin(b)); // Cambié `d` a `d2`
-            const dp = [p[0] + d2[0] * lineWeight / 2, p[1] + d2[1] * lineWeight / 2]; // Cambié `d` a `d2`
-            const x1 = np[0] + flip(np[0] - cp[0], np[1] - cp[1])[0] * lineWeight;
-            const y1 = np[1] + flip(np[0] - cp[0], np[1] - cp[1])[1] * lineWeight;
-            const x2 = dp[0] + flip(dp[0] - np2[0], dp[1] - np2[1])[0] * lineWeight;
-            const y2 = dp[1] + flip(dp[0] - np2[0], dp[1] - np2[1])[1] * lineWeight;
-            ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
-            ctx.stroke();
-            return [bezP(bPoint[0], bPoint[1], bPoint[2], bPoint[3], modGT), r];
-        };
-
-        // Main draw function
-        const draw = () => {
-            ctx.clearRect(0, 0, dim, dim);
-            const [p, r] = logoP(cycle ? (currentOutput * 2 - 1) : 1, gt, loop, currentOutput);
-            gt += step;
-            if (gt >= 1) {
-                gt = 0;
-                loop++;
+                    // Colores en tonos de rojos y violetas
+                    let red = color(252, 178, 179); // '#fcb2b3'
+                    let purple = color(138, 43, 226); // '#8a2be2'
+                    let violet = color(102, 180, 218); // '#66b4da'
+                    let fillColor = lerpColor(red, violet, i / numCircles);
+                    fill(fillColor); // Color del punto
+                    ellipse(x, y, adjustedDotRadius, adjustedDotRadius); // Dibujar el punto
+                }
             }
-            requestAnimationFrame(draw);
-        };
 
-        // Start the animation
-        draw();
+            // Dibujar el logo
+            imageMode(CENTER);
+            let logoWidth = width / 3;
+            let logoHeight = (logo.height / logo.width) * logoWidth;
+            image(logo, width / 2, height - logoHeight / 2, logoWidth, logoHeight);
+            
+            lastMouseDist = dist(width / 2, height / 2, mouseX, mouseY); // Actualizar la última distancia al mouse
+        }
     </script>
 </body>
 </html>
