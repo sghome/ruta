@@ -95,7 +95,7 @@
         // Setup function
         function setup() {
             // Init p5 contexts
-            ctx = Array.from({ length: 8 }, () => createGraphics(dim, dim, P3D));
+            ctx = Array.from({ length: 8 }, () => createGraphics(dim, dim, WEBGL));
             // We're going to need the points for the shapes to make the collide context
             let points = [];
             points.push(...bezControlPoints);
